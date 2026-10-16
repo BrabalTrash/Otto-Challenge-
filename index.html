@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#263d30">
+<title>Meine Probier-Challenge</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#26352b;background:#f5f3eb}
+*{box-sizing:border-box}
+body{margin:0;padding:18px;max-width:650px;margin-inline:auto}
+h1{font-size:28px;margin-bottom:5px}
+h2{font-size:19px;margin:8px 0}
+p{line-height:1.5}
+.card{background:white;padding:17px;border-radius:18px;margin:14px 0;box-shadow:0 2px 12px #0000000b}
+button{background:#294b37;color:white;border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:650;cursor:pointer}
+button.secondary{background:#e7e9e2;color:#26352b}
+button:disabled{opacity:.45}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions button{flex:1}
+.result{font-size:17px;padding:12px 0;border-bottom:1px solid #eee}
+.result:last-child{border:0}
+.kind{font-size:11px;color:#657666;font-weight:750;letter-spacing:1px}
+label.item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #eee;line-height:1.4}
+input[type=checkbox]{width:20px;height:20px;accent-color:#294b37;flex-shrink:0}
+progress{width:100%;height:12px;accent-color:#294b37}
+summary{font-weight:700;font-size:17px;cursor:pointer;padding:10px 0}
+.small{font-size:13px;color:#687168}
+#status{color:#294b37;font-size:13px}
+</style>
+</head>
+<body>
+<h1>🍽️ Meine Probier-Challenge</h1>
+<p>Probiere dich durch die Karte – eine zufällige Mahlzeit nach der anderen.</p>
+
+<div class="card">
+<h2>🎲 Deine nächste Mahlzeit</h2>
+<div id="meal"><p class="small">Bereit für deine nächste Kombination?</p></div>
+<div class="actions">
+<button onclick="draw()">🎲 Auslosen</button>
+<button class="secondary" onclick="completeMeal()" id="done" disabled>✓ Alles probiert</button>
+</div>
+<p id="status" aria-live="polite">Dein Fortschritt wird automatisch gespeichert.</p>
+</div>
+
+<div class="card">
+<h2>Dein Fortschritt</h2>
+<p id="count">0 Einträge probiert</p>
+<progress id="progress" value="0" max="1"></progress>
+<p class="small">Abgehakte Einträge werden nicht erneut ausgelost.</p>
+</div>
+
+<div id="lists" class="card">
+<h2>📋 Meine Checkliste</h2>
+<p class="small">Hake auch Dinge ab, die du schon vor deiner Challenge probiert hast.</p>
+</div>
+
+<div class="card">
+<h2>⚙️ Daten & Fortschritt</h2>
+<div class="actions">
+<button class="secondary" onclick="exportData()">Daten exportieren</button>
+<button class="secondary" onclick="document.getElementById('importFile').click()">Daten importieren</button>
+</div>
+<input id="importFile" type="file" accept=".json,application/json" hidden onchange="importData(event)">
+<p class="small">Exportiere regelmäßig eine Sicherung. Das ist besonders wichtig, wenn du Browserdaten löschst oder dein Handy wechselst.</p>
+<button class="secondary" onclick="resetAll()">Alles zurücksetzen</button>
+</div>
+
+<script>
+const groups = [
+{title:"Hauptspeisen",type:"main",items:[
+"Currywurst mit Pommes",
+"2 Debreziner mit Sauerkraut",
+"6 Nürnberger Bratwürste mit Sauerkraut",
+"2 Paar Wiener mit Senf und Weißbrot",
+"Gebratener Leberkäse mit Kartoffelsalat",
+"5 Fischstäbchen mit Kartoffelsalat",
+"Rigatoni alla Mama",
+"Spaghetti Gorgonzola",
+"Spaghetti con Carne",
+"Spaghetti / Rigatoni Bolognese",
+"Chili con Carne",
+"Calamari-Salat mit Tzatziki und Weißbrot",
+"Putenstreifen-Salat mit Weißbrot",
+"Süßkartoffel-Falafel-Salat (vegan)",
+"Schafskäse-Salat mit Zwiebeln und Weißbrot",
+"Thunfisch-Salat mit Weißbrot",
+"Schinken-Käse-Salat mit Weißbrot",
+"Gemischter Salat"
+]},
+{title:"Beilagen & Kleinigkeiten",type:"side",items:[
+"Pommes mit Ketchup oder Mayo","Knoblauchbaguette",
+"Tzatziki mit Baguette","Schinken-Käse-Baguette",
+"Hausgemachter Kartoffelsalat"
+]},
+{title:"Nachspeisen",type:"dessert",items:[
+"Nussecken","Panna Cotta"
+]},
+{title:"Alkoholfreie Getränke",type:"soft",items:[
+"Apfel-Kirsch-Schorle","Maracuja-Traube-Schorle",
+"Rhabarber-Orange-Schorle","Johannisbeer-Banane-Schorle",
+"Coca-Cola","Spezi","Mineralwasser","Limo weiß/gelb",
+"Eistee Pfirsich","Latte Macchiato","Cappuccino",
+"Milchkaffee","Heiße Schokolade","Tasse Kaffee","Espresso","Tee",
+"Karamalz","Wolfertstetter Alkoholfreies Weizen",
+"Null Komma Josef alkoholfreies Hell"
+]},
+{title:"Biere",type:"alcohol",items:[
+"Deggendorfer Fassbier Hell","Irlbacher Hell",
+"Deggendorfer Weizen","Wolfertstetter Weizen",
+"Wolfertstetter Dunkles Bier","Wolfertstetter Dunkles Weizen",
+"Wolfertstetter Leichtes Weizen","Radlerhalbe",
+"Limo-Weizen","Cola-Weizen","Irlbacher Pils"
+]},
+{title:"Weine",type:"alcohol",items:[
+"Pinot Grigio","Grüner Veltliner","Redina",
+"Blauer Zweigelt","Merlot","Weinschorle weiß","Weinschorle rot"
+]},
+{title:"Schnäpse & Spirituosen",type:"alcohol",items:[
+"Obstler","Willi","Ramazzotti mit Eis","Averna mit Eis",
+"Jägermeister","Martini mit Eis","Apfelkorn","Ouzo","Grappa","Sambuca"
+]},
+{title:"Sekt",type:"alcohol",items:["Glas Sekt","Glas Prosecco"]},
+{title:"Mixgetränke",type:"alcohol",items:[
+"Aperol Spritz","Gin Tonic","Vodka Lemon","Campari Orange",
+"Bacardi Cola","Southern Kirsch"
+]}
+];
+
+const KEY = "meine-probier-challenge-v1";
+let state = {tried:[], meal:null};
+function load(){
+try{
+  const saved=JSON.parse(localStorage.getItem(KEY)||"null");
+  if(saved && Array.isArray(saved.tried))
+   state={tried:saved.tried,meal:saved.meal||null};
+}catch(e){}
+}
+function save(){
+try{
+  localStorage.setItem(KEY,JSON.stringify(state));
+  document.getElementById("status").textContent="✓ Automatisch gespeichert";
+}catch(e){
+  document.getElementById("status").textContent=
+   "Speichern nicht möglich – bitte Daten exportieren.";
+}
+render();
+}
+function all(type){
+return groups.filter(g=>g.type===type).flatMap(g=>g.items);
+}
+function available(type){
+return all(type).filter(x=>!state.tried.includes(x));
+}
+function draw(){
+const main=available("main");
+const soft=available("soft");
+const alcohol=available("alcohol");
+if(!main.length||!soft.length||!alcohol.length){
+  state.meal=null;
+  render();
+  document.getElementById("status").textContent=
+   "Eine Kategorie ist aufgebraucht. Setze Häkchen zurück oder exportiere deinen Fortschritt.";
+  return;
+}
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+state.meal={main:pick(main),soft:pick(soft),alcohol:pick(alcohol)};
+save();
+}
+function completeMeal(){
+if(!state.meal)return;
+state.tried=[...new Set([
+  ...state.tried,state.meal.main,state.meal.soft,state.meal.alcohol
+])];
+state.meal=null;
+save();
+}
+function toggle(item,checked){
+if(checked)state.tried=[...new Set([...state.tried,item])];
+else state.tried=state.tried.filter(x=>x!==item);
+save();
+}
+function render(){
+const m=state.meal;
+document.getElementById("meal").innerHTML=m?
+  `<div class="result"><div class="kind">🍝 HAUPTSPEISE</div>${esc(m.main)}</div>
+   <div class="result"><div class="kind">🥤 ALKOHOLFREIES GETRÄNK</div>${esc(m.soft)}</div>
+   <div class="result"><div class="kind">🍷 ALKOHOLISCHES GETRÄNK</div>${esc(m.alcohol)}</div>`:
+  '<p class="small">Drücke auf „Auslosen“, um eine Mahlzeit zu erhalten.</p>';
+document.getElementById("done").disabled=!m;
+const total=groups.reduce((n,g)=>n+g.items.length,0);
+document.getElementById("count").textContent=
+  `${state.tried.length} von ${total} Einträgen probiert`;
+document.getElementById("progress").max=total;
+document.getElementById("progress").value=state.tried.length;
+const root=document.getElementById("lists");
+root.querySelectorAll("details").forEach(x=>x.remove());
+groups.forEach(g=>{
+  const d=document.createElement("details");
+  const s=document.createElement("summary");
+  const done=g.items.filter(x=>state.tried.includes(x)).length;
+  s.textContent=`${g.title} (${done}/${g.items.length})`;
+  d.appendChild(s);
+  g.items.forEach(item=>{
+   const l=document.createElement("label");
+   l.className="item";
+   const c=document.createElement("input");
+   c.type="checkbox";c.checked=state.tried.includes(item);
+   c.addEventListener("change",()=>toggle(item,c.checked));
+  const t=document.createElement("span");t.textContent=item;
+   l.append(c,t);d.appendChild(l);
+  });
+  root.appendChild(d);
+});
+}
+function esc(s){
+return String(s).replace(/[&<>"']/g,c=>({
+  "&":"&amp;","<":"&lt;",">":"&gt;",
+  '"':"&quot;","'":"&#39;"
+}[c]));
+}
+function resetAll(){
+if(!confirm("Wirklich alle Häkchen und den aktuellen Zufall löschen?"))return;
+state={tried:[],meal:null};save();
+}
+function exportData(){
+const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+const url=URL.createObjectURL(blob);
+const a=document.createElement("a");
+a.href=url;a.download="probier-challenge-sicherung.json";
+a.click();URL.revokeObjectURL(url);
+}
+function importData(event){
+const file=event.target.files[0];if(!file)return;
+const r=new FileReader();
+r.onload=()=>{
+  try{
+   const d=JSON.parse(r.result);
+   if(!Array.isArray(d.tried))throw Error();
+   const known=groups.flatMap(g=>g.items);
+   state={tried:d.tried.filter(x=>known.includes(x)),meal:null};
+   save();alert("Fortschritt importiert!");
+  }catch(e){alert("Datei konnte nicht gelesen werden.");}
+};
+r.readAsText(file);event.target.value="";
+}
+load();render();
+</script>
+</body>
+</html>
+
